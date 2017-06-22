@@ -13,6 +13,7 @@ library(ggplot2)
 #library(plyr)
 #library(dplyr)
 library(data.table)
+install.packages("glue")
 library(dtplyr)
 library(readr)
 #library(GeneOverlap)
@@ -27,7 +28,6 @@ Looking at commonalities between data available for Nup98 (ChIP-seq, RIP-seq, tr
 Capitanio JS, Montpetit B, Wozniak RW. Human Nup98 regulates the localization and activity of DExH/D-box helicase DHX9. Elife [Internet] 2017 [cited 2017 Feb 23]; 6. Available from: http://www.ncbi.nlm.nih.gov/pubmed/28221134
 
 A summary table of DBPs interacting with Nup98 and the number of unique peptide hits detected for each helicase in the Nup98 co-IP MS is shown below.
-
 ```{r}
 DBP <- c("DDX21","DDX5","DDX17","DHX15","DDX3","DHX9")
 Hits <- c(26,18,15,10,10,15)
@@ -80,7 +80,7 @@ Kindly provided by Drs. Hayriye Erkizan and Jeffrey Toretsky (Georgetown Univers
 
 Erkizan H V, Schneider JA, Sajwan K, Graham GT, Griffin B, Chasovskikh S, Youbi SE, Kallarakal A, Chruszcz M, Padmanabhan R, et al. RNA helicase A activity is inhibited by oncogenic transcription factor EWS-FLI1. Nucleic Acids Res [Internet] 2015; 43:1069-80. Available from: http://www.ncbi.nlm.nih.gov/pubmed/25564528
 
-#Control Datasets:
+## Control Datasets:
 
 ## DDX6
 
@@ -107,7 +107,7 @@ Marchese F, Grossi E, Marín-Béjar O, Bharti S, Raimondi I, González J, Martínez-
 
 Let's start downloading and comparing the datasets available.
 
-####OF NOTE:
+#### OF NOTE:
 
 This document refers to the part of the analysis that was not described in the publications the original datasets came from. 
 The steps before this were performed according to what was done in each paper, see the references above. For genome annotation I used Ensembl and UCSC genome browser (GRCh37/hg19).
@@ -139,7 +139,6 @@ For each dataset:
 * Join plus and minus strand reads or replicate reads; 
 * In a separate table aggragate by gene;
 * When necessary (Nup98 and DHX9) remove the interactors that show a p-value above 0.05 or fold-change under 1.5 - other samples were prefiltered before import, so this step is not necessary;
-
 ```{r, message=FALSE,results='hide',warning=FALSE}
 RHA_RIP <- read_csv("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/RIP-DHX9/RHA_RIP_genesAnno.csv", col_types = cols(X1 = col_skip()))
 
@@ -160,7 +159,6 @@ rm(DHX9v2RIPdt)
 ```
 
 Now load the data of annotated peaks from the DDX3 CLIP-seq dataset and process as described above for DHX9 until I have a table of genes.
-
 ```{r, message=FALSE,results='hide'}
 DDX3wtCLIP_ensemblGenes <- read_delim("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/GSE70801-RIP DDX3/DDX3wtCLIP_ensemblGenes", "\t", escape_double = FALSE, trim_ws = TRUE, skip = 1)
 ```
@@ -184,7 +182,6 @@ rm(DDX3v2RIPdt)
 ```
 
 Up next let's do all the same for DDX21 CLIP-seq data:
-
 ```{r, message=FALSE,results='hide'}
 DDX21wtCLIP_ensemblGenes <- read_delim("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/GSE56802-RIP DDX21/DDX21wtCLIP_ensemblGenes", "\t", escape_double = FALSE, trim_ws = TRUE, skip = 1)
 ```
@@ -204,15 +201,12 @@ rm(DDX21RIPdt)
 ```
 
 Let's do Nup98 now. For this, since it was a regular RNA-IP and not the CLIP-seq or FAST-seq the processing was done differently, so I'll just import the resulting tables here. I'm using the table by genes here.
-
 ```{r, message=FALSE,results='hide'}
-N98RIP_genes <- read_delim("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/GSE67963-RIP N98/GSE67963_significance_calls_genes.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+N98RIP_genes <- read_csv("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/GSE67963-RIP N98/GSE67963_significance_calls_genes.csv")
+
 ```
 
 ```{r}
-#Separate only nup98 data
-N98RIP_genes <- N98RIP_genes[N98RIP_genes$sample_2 == "nup98",]
-
 #Fix the gene and transcript names
 N98RIP_genes$test_id <- sapply(strsplit(as.character(N98RIP_genes$test_id), "\\."), "[[", 1)
 
@@ -226,7 +220,6 @@ N98RIP_gen.05 <- N98RIP_genes.05$test_id
 ```
 
 Let's save all this data before we do any analysis. then let's remove that while we do all the same processing for the control dataset.
-
 ```{r}
 save.image(file = "RIP-seq tables Nucleus.RData")
 rm(list=ls(globalenv()))
@@ -235,7 +228,6 @@ rm(list=ls(globalenv()))
 We have 2 control datasets, DDX6 and DDX59 CLIP-seq data from ENCODE. 
 
 Let's start by loading all of them and removing incomplete rows
-
 ```{r, message=FALSE,results='hide'}
 DDX6 <- read_delim("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIPseq/Cnegs ENCODE/ensemblGenes_DDX6intersect", "\t", escape_double = FALSE, trim_ws = TRUE, skip = 1)
 DDX6 <- DDX6[complete.cases(DDX6),]
@@ -248,7 +240,6 @@ DDX59 <- DDX59[complete.cases(DDX59),]
 
 
 We'll beging by aggregating the data by gene ID:
-
 ```{r}
 DDX6 <- data.table(DDX6)
 DDX59 <- data.table(DDX59)
@@ -273,14 +264,12 @@ rm(DDX59)
 ```
 
 Now save the control datasets as well.
-
 ```{r}
 #Save this as the control dataset
 save.image(file = "RIP-seq tables CONTROLS Nucleus.RData")
 ```
 
 Let's bring back the data from before, of the samples from DBPs that interact with Nup98.
-
 ```{r}
 load("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/RIP-seq tables Nucleus.RData")
 ```
@@ -292,7 +281,6 @@ Let's get some samples of the counts for genes that interact with Nup98 and thos
 First DDX21, using counts of intervals mapped to the same gene as our quantitative variable and separating the genes encoding the mRNAs bound by DDX21 into 2 categories: genes whose mRNAs also interact with Nup98 and those that don't.
 
 ### DDX21
-
 ```{r}
 #For genes that bind Nup98
 DDX21RIPgeneDT$test <- (DDX21RIPgeneDT$ensGene.name2 %in% N98RIP_gen.05)
@@ -328,7 +316,6 @@ Let's use a permutation test on those count values for our hypothesis test. We'd
 The permutation test will take a sample of the count values from all DDX21 interacting mRNAs (independently of whether or not they also bind Nup98) and randomly assign a label a these values (yes or no for also binding Nup98), then it will compare this generated data to the real data with the correct labels to see if the difference is statistically significant. This process is repeated 100000 times to reach a p-value estimate.
 
 Note: since this is a sampling methodology the p-values obtained will not always be identical, but should be very similar.
-
 ```{r}
 independence_test(DDX21RIPgeneDT$count ~ DDX21RIPgeneDT$test, distribution = approximate(B=100000))
 ```
@@ -336,7 +323,6 @@ independence_test(DDX21RIPgeneDT$count ~ DDX21RIPgeneDT$test, distribution = app
 Now DHX9, let's repeat all the analysis done above for DDX21 woth the DHX9 dataset.
 
 ### DHX9
-
 ```{r}
 #For genes that bind Nup98
 DHX9v2RIPgeneDT$test <- (DHX9v2RIPgeneDT$gene_id.y %in% N98RIP_gen.05)
@@ -368,7 +354,6 @@ mtext(text="Number of DHX9 interacting \n mRNA intervals per gene", side=1, line
 ```
 
 Statistical test for DHX9:
-
 ```{r}
 independence_test(DHX9v2RIPgeneDT$count ~ DHX9v2RIPgeneDT$test, distribution = approximate(B=100000))
 ```
@@ -376,7 +361,6 @@ independence_test(DHX9v2RIPgeneDT$count ~ DHX9v2RIPgeneDT$test, distribution = a
 Repeating the procedure for DDX3.
 
 ### DDX3
-
 ```{r}
 #For genes that bind Nup98
 DDX3v2RIPgeneDT$test <- (DDX3v2RIPgeneDT$ensGene.name2 %in% N98RIP_gen.05)
@@ -408,17 +392,15 @@ mtext(text="Number of DDX3 interacting \n mRNA intervals per gene", side=1, line
 ```
 
 Statistical test for DDX3:
-
 ```{r}
 independence_test(DDX3v2RIPgeneDT$count ~ DDX3v2RIPgeneDT$test, distribution = approximate(B=100000))
 ```
 
-## Do we observe different results if we repeat the analysis above for mRNAs bound by control DBPs, that do not interact with Nup98?
+### Do we observe different results if we repeat the analysis above for mRNAs bound by control DBPs, that do not interact with Nup98?
 
 Let's repeat the analysis for 2 control dataset from DBPs that don't interact with Nup98:
 
 ### DDX6:
-
 ```{r}
 #For genes that bind Nup98
 DDX6RIP$test <- (DDX6RIP$ensGene.name2 %in% N98RIP_gen.05)
@@ -450,13 +432,11 @@ mtext(text="Number of DDX6 interacting \n mRNA intervals per gene", side=1, line
 ```
 
 Statistical test for DDX6:
-
 ```{r}
 independence_test(DDX6RIP$count ~ DDX6RIP$test, distribution = approximate(B=100000))
 ```
 
 ### DDX59:
-
 ```{r}
 #For genes that bind Nup98
 DDX59RIP$test <- (DDX59RIP$ensGene.name2 %in% N98RIP_gen.05)
@@ -512,7 +492,6 @@ mtext(text="Number of DHX9 interacting \n mRNA intervals per gene", side=2, line
 ```
 
 Now for boxplots of the negative controls:
-
 ```{r,fig.height=5,fig.width=3.5}
 boxplot(DDX6noNup98resampledMeans,DDX6wNup98resampledMeans, names = c("No", "Yes"), main = "DDX6", ylab = "", xlab = "Interaction of Nup98 with target mRNA")
 mtext(text="Number of DDX6 interacting \n mRNA intervals per gene", side=2, line=2)   
@@ -529,7 +508,6 @@ We can get around this a little bit by centering and scaling the values from eac
 First let's set the data from the bootstrapped means into tables containing the counts value and the Nup98 binding status for each DBP. Then, let's add an extra column for the scaled, centered, Z-scores for the entire dataset.
 
 DDX21:
-
 ```{r}
 Value <- DDX21noNup98resampledMeans
 Nup98.bound <- rep("no",length(Value))
@@ -549,7 +527,6 @@ rm(DDX21.yes)
 ```
 
 DDX3:
-
 ```{r}
 Value <- DDX3v2noNup98resampledMeans
 Nup98.bound <- rep("no",length(Value))
@@ -569,7 +546,6 @@ rm(DDX3.yes)
 ```
 
 DHX9:
-
 ```{r}
 Value <- DHX9v2noNup98resampledMeans
 Nup98.bound <- rep("no",length(Value))
@@ -589,7 +565,6 @@ rm(DHX9.yes)
 ```
 
 DDX59:
-
 ```{r}
 Value <- DDX59noNup98resampledMeans
 Nup98.bound <- rep("no",length(Value))
@@ -609,7 +584,6 @@ rm(DDX59.yes)
 ```
 
 DDX6:
-
 ```{r}
 Value <- DDX6noNup98resampledMeans
 Nup98.bound <- rep("no",length(Value))
@@ -630,7 +604,6 @@ rm(DDX6.yes)
 ```
 
 Since the Z-scores have been calculated separately for each DBP, now we can put together a table with all the data from all the DBPs.
-
 ```{r}
 All <- rbind(DDX21,DDX3,DHX9,DDX59,DDX6)
 
@@ -639,7 +612,6 @@ All$scaleT <- unlist(as.numeric(as.character(All$scaleT)))
 ```
 
 Let's have a look at the boxplots again to ensure the centering and scaling had no effect on the distribution of the underlying data.
-
 ```{r,fig.height=5,fig.width=7}
 ggplot(All, aes(x=Nup98.bound,y=Value,fill=Nup98.bound)) + 
   geom_boxplot()+ facet_wrap(~DBP.RIP,scales = "free") +
@@ -664,3 +636,284 @@ ggplot(All, aes(x=Nup98.bound,y=scaleT,fill=Nup98.bound)) +
 
 Looks good. Remeber, the top row of boxplots contains DBPs that interact with Nup98 and the bottom row has the control DBPs that do not interact with Nup98.
 
+Now let's clean the workspace and move on to the ChIP-seq analysis
+```{r}
+rm(list=ls(globalenv()))
+```
+
+# Chromatin immunoprecipitation of DBPs and Nup98
+
+For this second part of the analysis we'll use the bed files making the identified peaks from ChIP-seq experiments described above.
+
+```{r, message=FALSE, warning=FALSE}
+#If need be:
+
+source("http://bioconductor.org/biocLite.R")
+biocLite("ChIPseeker")
+biocLite("clusterProfiler")
+biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
+biocLite("org.Hs.eg.db")
+biocLite("GenomicFeatures")
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(ChIPseeker)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(GenomicFeatures)
+library(regioneR)
+
+```
+
+Let's read the bed files containing ChIP-seq peaks for our proteins of interest:
+
+```{r}
+files <- list.files("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed files")
+files
+```
+
+```{r, message=FALSE, warning=FALSE}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed files")
+#Make sure the names here agree with the order of files in the list above
+
+DDX11 = readPeakFile(files[[1]])
+DDX21 = readPeakFile(files[[2]])
+DDX21 = DDX21[seqnames(DDX21) != 'chrM']
+DDX5 = readPeakFile(files[[3]])
+N98FL = readPeakFile(files[[4]])
+N98Nt = readPeakFile(files[[5]])
+
+#rm(files)
+```
+
+Next let's just have a look at the peak locations:
+
+```{r,fig.width=10,fig.height=7, fig.height=15, fig.width=20, message=FALSE, warning=FALSE}
+peaks=GenomicRanges::GRangesList(N98FL=N98FL,N98Nt=N98Nt,DDX21=DDX21,DDX5=DDX5,DDX11=DDX11)
+rm(DDX11)
+rm(DDX21)
+rm(DDX5)
+rm(N98FL)
+rm(N98Nt)
+rm(files)
+#If you'd like to see the peaks on the chromosomes run the next line
+covplot(peaks)
+```
+
+We'll create a matrix of genomic regions around transcription start sites (TSS) to see how the peaks are distributed in relation to this feature. We'll expand to 10kb in each direction from the TSS.
+
+```{r}
+promoter <- getPromoters(TxDb=txdb, upstream=10000, downstream=10000)
+```
+
+To make all plots at once:
+```{r}
+# Of note, you may need a computer with more than 8GB of RAM in order to run the function below.
+tagMatrixList <- lapply(peaks, getTagMatrix, windows=promoter)
+```
+PAREI AQUI
+```{r}
+save(peaks,file = "all ChIP peaks as GRanges.RData")
+save(tagMatrixList,file = "all ChIP peaks tagMatrix list TSS 10k.RData")
+```
+
+Let's check the distribution of the peaks in relation to the TSS of interacting genes.
+```{r,fig.width=10,fig.height=10}
+plotAvgProf(tagMatrixList, xlim=c(-10000, 10000),facet = "row")
+```
+
+Let's do some statistical testing to see if the overlap between Nup98 peaks and DBP peaks is significant:
+```{r}
+rm(tagMatrixList)
+```
+
+Let's test each Nup98 file against each DBP file:
+```{r, message=TRUE, warning=TRUE}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed files")
+files <- list.files()
+# Confirm these are the correct bed files in the list
+files
+```
+Of note, since these are sampling methods the obtained p-values will not always be the same, but they should be similar.
+
+Full length Nup98 DamID-seq:
+```{r}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed files")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "BH", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+```{r}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed files")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:4], TxDb = txdb, pAdjustMethod = "BH", nShuffle = 1000, pool = TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Now let's annotate these peaks and look at what genomic features they interact with:
+```{r}
+peakAnnoList <- lapply(peaks, annotatePeak, TxDb=txdb,tssRegion=c(-3000, 3000), verbose=FALSE)
+```
+
+```{r}
+plotAnnoBar(peakAnnoList)
+```
+
+Now a profile of the distance to the TSS of each peak:
+```{r}
+plotDistToTSS(peakAnnoList)
+```
+
+We can annotate the peaks with gene ids and do some quick enrichment analysis
+```{r}
+genes = lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
+names(genes) = sub("_", "\n", names(genes))
+```
+
+```{r}
+compKEGG <- compareCluster(geneCluster   = genes,fun= "enrichKEGG",pvalueCutoff  = 0.05,pAdjustMethod = "BH")
+```
+
+```{r,fig.width=7.5,fig.height=10}
+plot(compKEGG, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+rm(compKEGG)
+```
+
+```{r}
+compGOenrich <- compareCluster(geneCluster=genes, fun="enrichGO", pvalueCutoff= 0.05, OrgDb='org.Hs.eg.db')
+```
+
+```{r,fig.width=13,fig.height=15}
+plot(compGOenrich, showCategory = 20, title = "Gene Ontology Enrichment Analysis")
+rm(compGOenrich)
+```
+
+```{r}
+compDO <- compareCluster(geneCluster = genes, fun= "enrichDO", pvalueCutoff = 0.05, pAdjustMethod = "BH")
+```
+
+```{r,fig.width=7.5,fig.height=15}
+plot(compDO, showCategory = 20, title = "Disease ontology Enrichment Analysis")
+rm(compDO)
+```
+
+```{r}
+genes= lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
+vennplot(genes)
+```
+
+Let's check how wide the peaks for each experiment are on average:
+```{r}
+test <- as.data.frame(ranges(peaks[[1]]))
+print(names(peaks)[[1]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[2]]))
+print(names(peaks)[[2]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[3]]))
+print(names(peaks)[[3]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[4]]))
+print(names(peaks)[[4]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[5]]))
+print(names(peaks)[[5]])
+mean(test$width)
+```
+
+Let's subset just the peaks from Nup98 and DBPs that interact within +/- 10kb of TSSs.
+
+```{r}
+Bound_promoters <- endoapply(peaks, subsetByOverlaps, query=promoter,ignore.strand=TRUE)
+```
+
+What proportion of the peaks is within the +/- 10kb region for each protein?
+```{r}
+prom_num=lapply(X = Bound_promoters, FUN = function(x) length(ranges(x)))
+total_num=lapply(X = peaks, FUN = function(x) length(ranges(x)))
+mapply("/",prom_num,total_num,SIMPLIFY = TRUE)
+```
+
+Now let's test if the overlap between Nup98 and DBPs is larger if we use only the peaks from promoter regions.
+
+
+```{r}
+biocLite("regioneR")
+library(regioneR)
+pt <- overlapPermTest(Bound_promoters[[1]], Bound_promoters[[5]], ntimes=1000, genome="hg19", count.once=TRUE)
+pt
+```
+
+We need to save the GRanges as bed files to do that.
+```{r}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed promoters")
+rtracklayer::export.bed(Bound_promoters[[1]], "N98FLpromoters.bed")
+rtracklayer::export.bed(Bound_promoters[[2]], "N98Ntpromoters.bed")
+rtracklayer::export.bed(Bound_promoters[[3]], "DDX21promoters.bed")
+rtracklayer::export.bed(Bound_promoters[[4]], "DDX5promoters.bed")
+rtracklayer::export.bed(Bound_promoters[[5]], "DDX11promoters.bed")
+```
+
+We also need to create a TxDb file made only of the promoter regions of genes for random sampling.
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/extra view/Nup98-DBPs_extraview/ChIPseq/bed promoters")
+promoterCo <- getPromoters(TxDb=txdb, upstream=15000, downstream=15000)
+
+promoterCO=c(resize(promoterCo, 10000, fix="center", use.names=TRUE, ignore.strand=FALSE),resize(promoterCo, 10000, fix="start", use.names=TRUE, ignore.strand=FALSE),resize(promoterCo, 10000, fix="end", use.names=TRUE, ignore.strand=FALSE))
+```
+
+```{r}
+promoterCO2=c(resize(promoterCO, 3334, fix="center", use.names=TRUE, ignore.strand=FALSE),resize(promoterCO, 3334, fix="start", use.names=TRUE, ignore.strand=FALSE),resize(promoterCO, 3334, fix="end", use.names=TRUE, ignore.strand=FALSE))
+```
+
+```{r}
+# Don't run for now...
+promoterCO3=c(resize(promoterCO2, 1112, fix="center", use.names=TRUE, ignore.strand=FALSE),resize(promoterCO2, 1112, fix="start", use.names=TRUE, ignore.strand=FALSE),resize(promoterCO2, 1112, fix="end", use.names=TRUE, ignore.strand=FALSE))
+```
+
+```{r}
+test1 <- asGFF(txdb)
+test <- makeTxDbFromGRanges(getPromoters(TxDb=txdb, upstream=15000, downstream=15000), drop.stop.codons=FALSE, metadata=NULL, taxonomyId=9606)
+```
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+files <- list.files()
+files
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:4], TxDb = promoterCO2, pAdjustMethod = "fdr", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:3], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= FALSE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = promoterCO2, pAdjustMethod = "BH", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= FALSE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+Now
