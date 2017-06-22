@@ -1,0 +1,317 @@
+---
+title: "Nup98 and DBPs ChIP-seq analysis"
+output: html_notebook
+---
+
+```{r "setup", include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "C:/Users/Juliana/Desktop/ChIPseq final")
+setwd("C:/Users/Juliana/Desktop/ChIPseq final")
+```
+
+```{r, message=FALSE, warning=FALSE}
+#If need be:
+
+source("http://bioconductor.org/biocLite.R")
+biocLite("ChIPseeker")
+biocLite("clusterProfiler")
+biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
+biocLite("org.Hs.eg.db")
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(ChIPseeker)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+Let's read the bed files containing ChIP-seq peaks for our proteins of interest:
+
+```{r}
+files <- list.files("C:/Users/Juliana/Desktop/ChIPseq final/bed files to use")
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed files to use")
+
+DDX11 = readPeakFile(files[[1]])
+DDX21 = readPeakFile(files[[2]])
+DDX21 = DDX21[seqnames(DDX21) != 'chrM']
+DDX5 = readPeakFile(files[[3]])
+N98FL = readPeakFile(files[[4]])
+N98Nt = readPeakFile(files[[5]])
+
+#rm(files)
+```
+We'll use functions from the ChIPseeker package, described here:
+
+https://bioconductor.org/packages/release/bioc/vignettes/ChIPseeker/inst/doc/ChIPseeker.html
+
+Next let's just have a look at the peaks
+
+```{r,fig.width=10,fig.height=7, fig.height=15, fig.width=20, message=FALSE, warning=FALSE}
+peaks=GenomicRanges::GRangesList(N98FL=N98FL,N98Nt=N98Nt,DDX21=DDX21,DDX5=DDX5,DDX11=DDX11)
+#If you'd like to see the peaks on the chromosomes run the next line
+#covplot(peaks)
+```
+
+We'll create a matrix of genomic regions around transcription start sites (TSS) to see how the peaks are distributed in relation to this feature.
+
+```{r}
+promoter <- getPromoters(TxDb=txdb, upstream=10000, downstream=10000)
+```
+
+To make all plots at once:
+```{r}
+tagMatrixList <- lapply(peaks, getTagMatrix, windows=promoter)
+```
+
+```{r}
+save(peaks,file = "all ChIP peaks as GRanges.RData")
+save(tagMatrixList,file = "all ChIP peaks tagMatrix list TSS 10k.RData")
+```
+
+If you need more memory, clear the environment and reload the two saved above and the following:
+
+```{r}
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+promoter <- getPromoters(TxDb=txdb, upstream=10000, downstream=10000)
+```
+
+Let's check the distribution of the peaks in relation to the TSS of interacting genes.
+```{r,fig.width=10,fig.height=10}
+plotAvgProf(tagMatrixList, xlim=c(-10000, 10000),facet = "row")
+```
+
+The graph below take forever, so make sure you need it before running this thing. It'll be over an hour at least...
+```{r,fig.width=10,fig.height=10}
+plotAvgProf(tagMatrixList, xlim=c(-10000, 10000), conf=0.95,resample=100, facet="row")
+```
+
+Let's do some statistical testing to see if the overlap between Nup98 peaks and DBP peaks is significant:
+```{r}
+rm(tagMatrixList)
+```
+
+Let's test each Nup98 file against each DBP file:
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed files to use")
+files <- list.files()
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed files to use")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "BH", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed files to use")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:4], TxDb = txdb, pAdjustMethod = "BH", nShuffle = 1000, pool = TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Now let's annotate these peaks and look at what genomic features they interact with:
+
+```{r}
+peakAnnoList <- lapply(peaks, annotatePeak, TxDb=txdb,tssRegion=c(-3000, 3000), verbose=FALSE)
+```
+
+```{r}
+plotAnnoBar(peakAnnoList)
+```
+
+Now a profile of the distance to the TSS of each peak:
+
+```{r}
+plotDistToTSS(peakAnnoList)
+```
+
+We can annotate the peaks with gene ids and do some quick enrichment analysis
+
+```{r}
+genes = lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
+names(genes) = sub("_", "\n", names(genes))
+```
+
+```{r}
+compKEGG <- compareCluster(geneCluster   = genes,fun= "enrichKEGG",pvalueCutoff  = 0.05,pAdjustMethod = "BH")
+```
+
+```{r,fig.width=7.5,fig.height=10}
+plot(compKEGG, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+```
+
+```{r}
+compGOenrich <- compareCluster(geneCluster=genes, fun="enrichGO", pvalueCutoff= 0.05, OrgDb='org.Hs.eg.db')
+```
+
+```{r,fig.width=13,fig.height=15}
+plot(compGOenrich, showCategory = 20, title = "Gene Ontology Enrichment Analysis")
+```
+
+```{r}
+compDO <- compareCluster(geneCluster = genes, fun= "enrichDO", pvalueCutoff = 0.05, pAdjustMethod = "BH")
+```
+
+```{r,fig.width=7.5,fig.height=15}
+plot(compDO, showCategory = 20, title = "Disease ontology Enrichment Analysis")
+```
+
+```{r}
+genes= lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
+vennplot(genes)
+```
+Let's find some genes of interest to plot tracks:
+```{r}
+genesN98FL <- unlist(genes[[1]])
+genesN98Nt <- unlist(genes[[2]])
+genesDDX21 <- unlist(genes[[3]])
+genesDDX5 <- unlist(genes[[4]])
+genesDDX11 <- unlist(genes[[5]])
+```
+
+```{r}
+targetgenes <- genesN98Nt[genesN98Nt %in% genesN98FL & genesN98Nt %in% genesDDX5 & genesN98Nt %in% genesDDX21 & !(genesN98Nt %in% genesDDX11)]
+targetgenecounts <- as.data.frame(table(targetgenes))
+targetgenecounts <- targetgenecounts[order(-targetgenecounts$Freq),] 
+head(targetgenecounts,10)
+```
+
+```{r}
+targetgenesFL <- genesN98FL[genesN98FL %in% genesN98Nt & genesN98FL %in% genesDDX5 & genesN98FL %in% genesDDX21 & !(genesN98FL %in% genesDDX11)]
+targetgenecountsFL <- as.data.frame(table(targetgenesFL))
+targetgenecountsFL <- targetgenecountsFL[order(-targetgenecountsFL$Freq),] 
+head(targetgenecountsFL,10)
+```
+
+```{r}
+targetgenes98_5 <- genesN98FL[genesN98FL %in% genesDDX5 & !(genesN98FL %in% genesDDX11)]
+targetgenecounts98_5 <- as.data.frame(table(targetgenes98_5))
+targetgenecounts98_5 <- targetgenecounts98_5[order(-targetgenecounts98_5$Freq),] 
+head(targetgenecounts98_5,10)
+```
+
+```{r}
+targetgenes98_21 <- genesN98FL[genesN98FL %in% genesDDX21 & !(genesN98FL %in% genesDDX11)]
+targetgenecounts98_21 <- as.data.frame(table(targetgenes98_21))
+targetgenecounts98_21 <- targetgenecounts98_21[order(-targetgenecounts98_21$Freq),] 
+head(targetgenecounts98_21,10)
+```
+
+How wide are the peaks identified for each sample?
+```{r}
+test <- as.data.frame(ranges(peaks[[1]]))
+print(names(peaks)[[1]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[2]]))
+print(names(peaks)[[2]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[3]]))
+print(names(peaks)[[3]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[4]]))
+print(names(peaks)[[4]])
+mean(test$width)
+test <- as.data.frame(ranges(peaks[[5]]))
+print(names(peaks)[[5]])
+mean(test$width)
+```
+
+Let's subset just the peaks from Nup98 and DBPs that interact within +/- 10kb of TSSs.
+
+```{r}
+Bound_promoters <- endoapply(peaks, subsetByOverlaps, query=promoter,ignore.strand=TRUE)
+```
+
+What proportion of the peaks is within the +/- 10kb region for each protein?
+```{r}
+prom_num=lapply(X = Bound_promoters, FUN = function(x) length(ranges(x)))
+total_num=lapply(X = peaks, FUN = function(x) length(ranges(x)))
+mapply("/",prom_num,total_num,SIMPLIFY = TRUE)
+```
+
+We'll do the same but subsetting for peaks that overlap with FL, Nt Nup98 or either.
+
+```{r}
+N98FLoverlaps <- endoapply(peaks, subsetByOverlaps, query=N98FL,ignore.strand=TRUE)
+N98Ntoverlaps <- endoapply(peaks, subsetByOverlaps, query=N98Nt,ignore.strand=TRUE)
+N98both <- c(N98FL,N98Nt)
+N98bothoverlaps <- endoapply(peaks, subsetByOverlaps, query=N98both,ignore.strand=TRUE)
+
+#lapply(N98bothoverlaps, ranges)
+```
+
+What's the proportion of overlapping peaks?
+```{r}
+N98FL_num=lapply(X = N98FLoverlaps, FUN = function(x) length(ranges(x)))
+mapply("/",N98FL_num,total_num,SIMPLIFY = TRUE)
+
+N98Nt_num=lapply(X = N98Ntoverlaps, FUN = function(x) length(ranges(x)))
+mapply("/",N98Nt_num,total_num,SIMPLIFY = TRUE)
+
+N98both_num=lapply(X = N98bothoverlaps, FUN = function(x) length(ranges(x)))
+mapply("/",N98both_num,total_num,SIMPLIFY = TRUE)
+```
+
+Now let's test if the overlap between Nup98 and DBPs is larger if we use only the peaks from promoter regions.
+
+We need to save the GRanges as bed files to do that
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+rtracklayer::export.bed(Bound_promoters[[1]], "N98FLpromoters.bed")
+rtracklayer::export.bed(Bound_promoters[[2]], "N98Ntpromoters.bed")
+rtracklayer::export.bed(Bound_promoters[[3]], "DDX21promoters.bed")
+rtracklayer::export.bed(Bound_promoters[[4]], "DDX5promoters.bed")
+rtracklayer::export.bed(Bound_promoters[[5]], "DDX11promoters.bed")
+```
+Now the test:
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+files <- list.files()
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:4], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Nucleoplasmic Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[5], targetPeak = files[1:3], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= FALSE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+Making a control genome only with promoter regions:
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+promoterCo <- getPromoters(TxDb=txdb, upstream=15000, downstream=15000)
+promoterCO=c(resize(promoterCo, 10000, fix="center", use.names=TRUE, ignore.strand=FALSE),resize(promoterCo, 10000, fix="start", use.names=TRUE, ignore.strand=FALSE),resize(promoterCo, 10000, fix="end", use.names=TRUE, ignore.strand=FALSE))
+```
+
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+files <- list.files()
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "BH", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= FALSE, chainFile = NULL, verbose = FALSE)
+```
+
+Full length Nup98 DamID-seq:
+
+```{r}
+setwd("C:/Users/Juliana/Desktop/ChIPseq final/bed promoters")
+enrichPeakOverlap(queryPeak = files[4], targetPeak = files[c(1:3,5)], TxDb = txdb, pAdjustMethod = "fdr", nShuffle = 1000, pool= TRUE, chainFile = NULL, verbose = FALSE)
+```
